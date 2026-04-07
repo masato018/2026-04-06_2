@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LP作成エージェント概要</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;600;800;900&family=Inter:wght@400;600;700;900&display=swap');
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden;font-family:"Inter","Noto Sans JP",Helvetica,Arial,sans-serif;background:#fafafa}
+
+  .deck{position:relative;width:100vw;height:100vh}
+  .slide{position:absolute;inset:0;display:none;flex-direction:column;justify-content:center;align-items:center;padding:50px 100px;background:#fff}
+  .slide.active{display:flex;z-index:10;animation:slideIn .3s ease}
+  @keyframes slideIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+  .slide::before{content:'';position:absolute;top:0;left:80px;width:1px;height:100%;background:#e5e5e5;pointer-events:none}
+  .slide::after{content:'';position:absolute;bottom:60px;left:0;width:100%;height:1px;background:#e5e5e5;pointer-events:none}
+
+  h1{font-size:2.6rem;font-weight:900;color:#111;margin-bottom:16px;text-align:center;line-height:1.2;letter-spacing:-.03em}
+  h2{font-size:1.6rem;font-weight:900;color:#111;margin-bottom:18px;text-align:left;line-height:1.35;letter-spacing:-.02em}
+  h3{font-size:1.05rem;color:#111;margin-bottom:8px;font-weight:700}
+  p,li{font-size:.95rem;color:#444;line-height:1.8}
+  ul{list-style:none;padding:0}
+  ul li{padding-left:1.5em;position:relative;margin-bottom:12px}
+  ul li::before{content:"";position:absolute;left:0;top:.6em;width:7px;height:7px;background:#111}
+  strong{color:#111}
+  .accent{color:#e11d48}
+  .green{color:#059669}
+  .slide-label{position:absolute;top:28px;left:100px;font-size:.65rem;color:#bbb;letter-spacing:.2em;text-transform:uppercase;font-weight:700}
+
+  .nav{position:fixed;bottom:28px;right:36px;z-index:100;display:flex;gap:10px;align-items:center}
+  .nav button{width:40px;height:40px;border:2px solid #ddd;background:#fff;color:#111;font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s}
+  .nav button:hover{background:#e11d48;border-color:#e11d48;color:#fff}
+  .nav .counter{font-size:.75rem;color:#999;min-width:55px;text-align:center;font-weight:600}
+  .progress{position:fixed;top:0;left:0;height:3px;background:#e11d48;transition:width .4s ease;z-index:100}
+  .hint{position:fixed;bottom:28px;left:36px;font-size:.65rem;color:#ccc;z-index:100}
+
+  .diagram{display:flex;align-items:center;gap:14px;flex-wrap:wrap;justify-content:center;margin:20px 0}
+  .diagram .box{background:#f8f8f8;border:2px solid #e5e5e5;padding:16px 24px;font-size:.95rem;font-weight:700;color:#111;text-align:center;min-width:120px}
+  .diagram .box.highlight{background:#111;border-color:#111;color:#fff}
+  .diagram .box.accent-box{border-color:#e11d48;background:#fef2f2}
+  .diagram .box.green-box{background:#f0fdf4;border-color:#bbf7d0;color:#059669}
+  .diagram .box.green-fill{background:#059669;border-color:#059669;color:#fff}
+  .diagram .arrow{font-size:1.6rem;color:#ccc}
+
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:14px;width:100%;max-width:880px;margin-top:10px}
+  .card{background:#fff;border:2px solid #e5e5e5;padding:20px 24px;border-left:4px solid #111}
+  .card h3{color:#111;font-size:.95rem;margin-bottom:4px}
+  .card p{font-size:.85rem;color:#666}
+  .card.red{border-left-color:#e11d48}
+  .card.green{border-left-color:#059669}
+
+  .compare-table{width:100%;max-width:880px;border-collapse:collapse;margin-top:10px}
+  .compare-table th,.compare-table td{padding:12px 16px;text-align:left;font-size:.88rem;border-bottom:1px solid #e5e5e5}
+  .compare-table thead th{background:#111;color:#fff;font-weight:700}
+  .compare-table .old{color:#666;font-weight:600}
+  .compare-table .new{color:#059669;font-weight:700}
+
+  .new-flow{display:flex;flex-direction:column;align-items:center;gap:0;margin:14px 0}
+  .new-flow .nf-arrow{font-size:1.2rem;color:#059669;margin:3px 0}
+  .new-flow .nf-box{background:#f0fdf4;border:2px solid #bbf7d0;padding:12px 22px;font-size:.95rem;font-weight:700;color:#111;text-align:center}
+  .new-flow .nf-box.dark{background:#111;border-color:#111;color:#fff}
+  .new-flow .nf-box.agent{background:#059669;border-color:#059669;color:#fff}
+  .new-flow .nf-box.slack{background:#4A154B;border-color:#4A154B;color:#fff}
+  .new-flow .nf-box.cw{background:#f8f8f8;border-color:#e5e5e5}
+  .new-flow .nf-box.warn{border-color:#e11d48;background:#fef2f2}
+
+  .cost-compare{display:flex;gap:24px;max-width:880px;width:100%;margin-top:12px}
+  .cost-col{flex:1;padding:20px}
+  .cost-col.old{border:2px solid #e5e5e5;border-top:4px solid #111}
+  .cost-col.new{border:2px solid #bbf7d0;border-top:4px solid #059669}
+  .cost-col h3{font-size:.9rem;margin-bottom:12px;text-align:center}
+  .cost-item{padding:6px 10px;margin-bottom:4px;font-size:.78rem;font-weight:600;text-align:center}
+  .cost-col.old .cost-item{background:#f5f5f5;color:#444}
+  .cost-col.new .cost-item{background:#f0fdf4;color:#059669}
+  .cost-col.new .cost-item.hl{background:#059669;color:#fff}
+
+  .info-box{background:#f8f8f8;border:2px solid #e5e5e5;padding:18px 24px;max-width:680px;margin-top:10px;border-left:4px solid #111}
+  .info-box.red{border-left-color:#e11d48}
+  .info-box.green-b{border-left-color:#059669}
+  .info-box h3{color:#111;font-size:.95rem;margin-bottom:6px}
+  .info-box p{font-size:.88rem;color:#444}
+
+  .cover{background:#fff}
+  .cover::after{content:'';position:absolute;top:0;left:0;width:6px;height:100%;background:#e11d48;pointer-events:none}
+  .cover::before{content:'';position:absolute;bottom:0;left:0;width:100%;height:3px;background:#e11d48;pointer-events:none;z-index:2}
+  .cover .date{font-size:.8rem;color:#999;margin-top:24px}
+
+  .workflow{display:flex;align-items:center;gap:0;flex-wrap:wrap;justify-content:center;margin:16px 0}
+  .workflow .step{background:#111;padding:8px 14px;font-size:.78rem;font-weight:700;color:#fff;text-align:center}
+  .workflow .step.green-step{background:#059669}
+  .workflow .step.red-step{background:#e11d48}
+  .workflow .step-arrow{font-size:1rem;color:#ccc;padding:0 4px}
+
+  .ai-org{display:flex;flex-direction:column;align-items:center;gap:10px;margin:12px 0}
+  .ai-org-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center}
+  .ai-member{width:108px;text-align:center;padding:12px 6px;background:#f8f8f8;border:2px solid #e5e5e5}
+  .ai-member .ai-emoji{font-size:1.5rem;margin-bottom:2px}
+  .ai-member .ai-name{font-size:.72rem;font-weight:700;color:#111;margin-bottom:2px}
+  .ai-member .ai-role{font-size:.6rem;color:#666;font-weight:600}
+  .ai-member.agent-member{border-color:#059669;background:#f0fdf4}
+  .org-line{width:2px;height:12px;background:#111}
+  .org-hline{width:70%;max-width:420px;height:2px;background:#e5e5e5}
+
+  .bar-chart{display:flex;flex-direction:column;gap:10px;width:100%;max-width:700px;margin:14px 0}
+  .bar-row{display:flex;align-items:center;gap:12px}
+  .bar-label{min-width:140px;text-align:right;font-size:.82rem;font-weight:600;color:#111}
+  .bar-track{flex:1;height:24px;background:#f0f0f0}
+  .bar-fill{height:100%;display:flex;align-items:center;justify-content:flex-end;padding-right:8px;font-size:.72rem;font-weight:700;color:#fff}
+  .bar-fill.green-bar{background:#059669}
+  .bar-fill.dark-bar{background:#111}
+
+  .step-cards{display:flex;gap:0;align-items:stretch;max-width:880px;width:100%;margin:12px 0}
+  .step-card{flex:1;padding:18px;border:2px solid #e5e5e5;border-left:none;display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px}
+  .step-card:first-child{border-left:2px solid #e5e5e5}
+  .step-card .sc-num{width:28px;height:28px;background:#111;color:#fff;font-size:.75rem;font-weight:800;display:flex;align-items:center;justify-content:center}
+  .step-card .sc-emoji{font-size:1.6rem}
+  .step-card .sc-title{font-size:.85rem;font-weight:700;color:#111}
+  .step-card .sc-desc{font-size:.72rem;color:#888;line-height:1.5}
+  .step-card.green-card{border-color:#bbf7d0;background:#f0fdf4}
+  .step-card.green-card .sc-num{background:#059669}
+
+  .guard-steps{display:flex;flex-direction:column;gap:0;max-width:680px;width:100%;margin:10px 0}
+  .guard-step{display:flex;align-items:center;gap:14px;padding:14px 18px;border:2px solid #e5e5e5;border-bottom:none}
+  .guard-step:last-child{border-bottom:2px solid #e5e5e5}
+  .guard-step .gs-icon{font-size:1.4rem;flex-shrink:0}
+  .guard-step .gs-level{font-size:.65rem;font-weight:700;color:#999;letter-spacing:.1em}
+  .guard-step .gs-title{font-size:.88rem;font-weight:700;color:#111}
+  .guard-step .gs-desc{font-size:.78rem;color:#666}
+  .guard-step.warn{border-left:4px solid #e11d48}
+  .guard-step.ok{border-left:4px solid #059669}
+  .guard-step.block{border-left:4px solid #111;background:#f8f8f8}
+
+  .mock-cards{display:flex;gap:14px;max-width:880px;width:100%;margin:10px 0;flex-wrap:wrap;justify-content:center}
+  .mock-card{flex:1;min-width:240px;border:2px solid #e5e5e5;overflow:hidden}
+  .mock-card .mc-header{background:#111;color:#fff;padding:8px 14px;font-size:.78rem;font-weight:700}
+  .mock-card .mc-body{padding:12px 14px}
+  .mock-card .mc-row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #f0f0f0;font-size:.78rem;color:#444}
+  .mc-tag{padding:2px 6px;font-size:.68rem;font-weight:700;display:inline-block}
+  .mc-tag.ok{background:#f0fdf4;color:#059669}
+  .mc-tag.progress{background:#eff6ff;color:#2563eb}
+  .mc-tag.error{background:#fef2f2;color:#e11d48}
+
+  .slack-flow{display:flex;flex-direction:column;align-items:center;gap:0;max-width:520px;margin:10px 0}
+  .sf-step{width:100%;display:flex;align-items:center;gap:12px;padding:12px 18px;background:#f8f8f8;border:2px solid #e5e5e5;border-bottom:none}
+  .sf-step:last-child{border-bottom:2px solid #e5e5e5}
+  .sf-step .sf-icon{font-size:1.3rem;flex-shrink:0}
+  .sf-step .sf-text{font-size:.85rem;font-weight:600;color:#111}
+  .sf-step .sf-sub{font-size:.72rem;color:#888;font-weight:400}
+  .sf-step.sf-done{background:#f0fdf4;border-color:#bbf7d0}
+
+  @media(max-width:768px){
+    .slide{padding:32px 20px}h1{font-size:1.6rem}h2{font-size:1.2rem}
+    .cards{grid-template-columns:1fr}
+    .cost-compare{flex-direction:column}
+    .step-cards{flex-direction:column}
+    .mock-cards{flex-direction:column}
+    .bar-label{min-width:100px;font-size:.72rem}
+  }
+</style>
+</head>
+<body>
+<div class="progress" id="progress"></div>
+<div class="deck">
+
+<!-- S1: Cover -->
+<div class="slide cover active" data-slide="1">
+  <h1><span class="accent">LP作成エージェント</span>概要</h1>
+  <p style="font-size:1rem;color:#888;text-align:center;">AIがランディングページを自動で作成する仕組み</p>
+  <div class="date">2026年4月</div>
+</div>
+
+<!-- S2: Agenda -->
+<div class="slide" data-slide="2">
+  <span class="slide-label">AGENDA</span>
+  <h2>今日お伝えしたいこと</h2>
+  <ul style="max-width:600px;">
+    <li><strong>もともとの計画</strong>と今の形</li>
+    <li><strong>なぜ変えたのか</strong> &#x2500; Chatworkの課題と司令塔AIの問題</li>
+    <li>今の<strong>システム全体の構成</strong></li>
+    <li><strong>5つの専門AI</strong>の役割分担</li>
+    <li>LP完成までの<strong>流れ</strong></li>
+    <li>品質チェックと<strong>安全装置</strong></li>
+    <li><strong>管理画面・Slack連携</strong></li>
+    <li><strong>2つの作り方</strong>（Code / Canvas）</li>
+  </ul>
+</div>
+
+<!-- S3: もともとの計画 -->
+<div class="slide" data-slide="3">
+  <span class="slide-label">BEFORE</span>
+  <h2>もともとの計画：<span class="accent">ピラミッド型</span></h2>
+  <p style="text-align:center;margin-bottom:14px;font-size:.9rem;color:#888;">Chatwork上にBotを設置し、司令塔AIが全エージェントに指示を出す構成</p>
+  <div class="new-flow">
+    <div class="nf-box cw" style="min-width:260px;">&#x1F4AC; Chatwork</div>
+    <div class="nf-arrow">&#x2B07;</div>
+    <div class="nf-box dark" style="min-width:300px;">&#x1F916; メインエージェント（司令塔AI）<br><small style="font-size:.72rem;opacity:.7;">タスクに応じて最適なAIを選んで指示</small></div>
+    <div class="nf-arrow">&#x2B07;</div>
+    <div style="display:flex;gap:10px;">
+      <div class="nf-box" style="min-width:110px;">LP作成AI</div>
+      <div class="nf-box" style="min-width:110px;">動画作成AI</div>
+      <div class="nf-box" style="min-width:110px;">その他AI</div>
+    </div>
+  </div>
+  <div class="info-box" style="margin-top:16px;">
+    <h3>ポイント</h3>
+    <p>Bot1つにつき<strong>Googleアカウントが1つ必要</strong>。すべてのAIは司令塔を経由して動く</p>
+  </div>
+</div>
+
+<!-- S4: 今の形 -->
+<div class="slide" data-slide="4">
+  <span class="slide-label">CURRENT</span>
+  <h2>今の形：<span class="green">フラット型（直接指示）</span></h2>
+  <p style="text-align:center;margin-bottom:14px;font-size:.9rem;color:#888;">Slackから各AIに直接指示。間に挟まる司令塔AIを撤廃</p>
+  <div class="new-flow">
+    <div class="nf-box slack" style="min-width:260px;">&#x1F4AC; Slack</div>
+    <div class="nf-arrow">&#x2B07;</div>
+    <div style="display:flex;gap:10px;">
+      <div class="nf-box agent" style="min-width:110px;">LP作成AI</div>
+      <div class="nf-box agent" style="min-width:110px;">動画作成AI</div>
+      <div class="nf-box agent" style="min-width:110px;">その他AI</div>
+    </div>
+  </div>
+  <div style="margin:14px 0;padding:8px 20px;border:2px dashed #e11d48;display:inline-flex;align-items:center;gap:8px;">
+    <span style="text-decoration:line-through;color:#e11d48;font-size:.9rem;font-weight:700;">司令塔AI</span>
+    <span style="font-size:.75rem;font-weight:700;background:#e11d48;color:#fff;padding:2px 8px;">廃止</span>
+  </div>
+  <div class="info-box green-b" style="margin-top:10px;">
+    <h3 style="color:#059669;">結果</h3>
+    <p><span class="green">速い・安い・止まりにくい</span>。シンプルな構成で安定稼働</p>
+  </div>
+</div>
+
+<!-- S5: 変更理由 Chatwork -->
+<div class="slide" data-slide="5">
+  <span class="slide-label">RISK</span>
+  <h2>なぜ変えたのか &#x2460; <span class="accent">Chatworkの問題</span></h2>
+  <div style="display:flex;gap:20px;max-width:900px;width:100%;align-items:stretch;">
+
+    <!-- 左: Bot量産 -->
+    <div style="flex:1;border:2px solid #e5e5e5;border-top:4px solid #111;padding:0;display:flex;flex-direction:column;">
+      <div style="background:#111;color:#fff;padding:10px 18px;font-size:.78rem;font-weight:800;letter-spacing:.1em;">&#x1F464; SCALABILITY &#x2500; 拡張性の壁</div>
+      <div style="padding:18px;flex:1;">
+        <h3 style="font-size:1.05rem;color:#111;margin-bottom:12px;">Bot量産ができない</h3>
+
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <div style="display:flex;align-items:flex-start;gap:10px;background:#f8f8f8;padding:10px 14px;">
+            <div style="font-size:1.1rem;flex-shrink:0;">&#x1F4E7;</div>
+            <div>
+              <div style="font-size:.82rem;font-weight:700;color:#111;">Bot1つ = Googleアカウント1つ</div>
+              <div style="font-size:.75rem;color:#666;margin-top:2px;">ChatworkでBotを作るにはGoogleアカウントで認証が必要。Bot数ぶんアカウントを用意しなければならない</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:10px;background:#f8f8f8;padding:10px 14px;">
+            <div style="font-size:1.1rem;flex-shrink:0;">&#x1F6AB;</div>
+            <div>
+              <div style="font-size:.82rem;font-weight:700;color:#111;">Googleアカウント作成に上限がある</div>
+              <div style="font-size:.75rem;color:#666;margin-top:2px;">短期間に大量作成はできない。エージェントを増やしたくても物理的に作れない</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:10px;background:#f8f8f8;padding:10px 14px;">
+            <div style="font-size:1.1rem;flex-shrink:0;">&#x1F4CB;</div>
+            <div>
+              <div style="font-size:.82rem;font-weight:700;color:#111;">管理工数がBotの数だけ膨らむ</div>
+              <div style="font-size:.75rem;color:#666;margin-top:2px;">パスワード管理・2段階認証・アカウント棚卸し...Botが増えるほど運用負荷が増大</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:12px;background:#f8f8f8;border:2px solid #e5e5e5;padding:8px 14px;">
+          <div style="font-size:.78rem;font-weight:700;color:#111;">&#x279C; エージェントを増やして業務を拡大したくても、<strong>Chatworkの仕組みがボトルネック</strong>になる</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右: セキュリティ（大きく強調） -->
+    <div style="flex:1.6;border:2px solid #e11d48;border-top:4px solid #e11d48;padding:0;display:flex;flex-direction:column;">
+      <div style="background:#e11d48;color:#fff;padding:10px 18px;font-size:.78rem;font-weight:800;letter-spacing:.1em;">&#x26A0;&#xFE0F; CRITICAL RISK &#x2500; 最重要の移行理由</div>
+      <div style="padding:18px;flex:1;">
+        <h3 style="font-size:1.05rem;color:#e11d48;margin-bottom:12px;">&#x1F512; セキュリティリスク</h3>
+
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <div style="display:flex;align-items:flex-start;gap:10px;background:#fef2f2;padding:10px 14px;">
+            <div style="font-size:1.1rem;flex-shrink:0;">&#x1F6A8;</div>
+            <div>
+              <div style="font-size:.82rem;font-weight:700;color:#111;">直近、アカウント乗っ取り被害が多発</div>
+              <div style="font-size:.75rem;color:#666;margin-top:2px;">Chatworkのセキュリティ問題が増加しており、第三者によるアカウント不正アクセスが現実的な脅威</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:10px;background:#fef2f2;padding:10px 14px;">
+            <div style="font-size:1.1rem;flex-shrink:0;">&#x1F511;</div>
+            <div>
+              <div style="font-size:.82rem;font-weight:700;color:#111;">AIエージェントは機密情報に直接アクセスする</div>
+              <div style="font-size:.75rem;color:#666;margin-top:2px;">社内データ・APIキー・顧客情報に触れるBotが乗っ取られた場合、<strong style="color:#e11d48;">被害は甚大</strong></div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:10px;background:#fef2f2;padding:10px 14px;">
+            <div style="font-size:1.1rem;flex-shrink:0;">&#x1F3E2;</div>
+            <div>
+              <div style="font-size:.82rem;font-weight:700;color:#111;">Chatwork側のセキュリティ対策に依存</div>
+              <div style="font-size:.75rem;color:#666;margin-top:2px;">自社でコントロールできない部分にリスクがある状態。対策の主導権が持てない</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:12px;background:#111;color:#fff;padding:10px 16px;display:flex;align-items:center;gap:8px;">
+          <div style="font-size:.85rem;">&#x279C;</div>
+          <div style="font-size:.82rem;font-weight:700;">機密情報に触れるエージェントをChatwork上に置くことは<span style="color:#e11d48;">許容できないリスク</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- S6: 変更理由 メインエージェント -->
+<div class="slide" data-slide="6">
+  <span class="slide-label">WHY</span>
+  <h2>なぜ変えたのか &#x2461; <span class="accent">司令塔AIのデメリット</span></h2>
+  <div style="display:flex;gap:20px;max-width:900px;width:100%;align-items:stretch;">
+
+    <!-- 左: 図解 -->
+    <div style="flex:1;display:flex;flex-direction:column;gap:10px;">
+      <!-- 費用 -->
+      <div style="border:2px solid #e5e5e5;border-left:4px solid #e11d48;padding:14px 16px;display:flex;align-items:center;gap:14px;">
+        <div style="font-size:1.6rem;flex-shrink:0;">&#x1F4B8;</div>
+        <div style="flex:1;">
+          <div style="font-size:.88rem;font-weight:800;color:#111;margin-bottom:4px;">費用が2倍かかる</div>
+          <div style="display:flex;align-items:center;gap:6px;margin-top:6px;">
+            <div style="background:#fef2f2;border:1px solid #fecaca;padding:4px 10px;font-size:.68rem;font-weight:700;color:#e11d48;text-align:center;">ユーザー</div>
+            <div style="font-size:.8rem;color:#ccc;">&#x279C;</div>
+            <div style="background:#fef2f2;border:1px solid #fecaca;padding:4px 10px;font-size:.68rem;font-weight:700;color:#e11d48;text-align:center;">司令塔AI<br><small style="font-size:.55rem;color:#e11d48;">&#xA5; 課金</small></div>
+            <div style="font-size:.8rem;color:#ccc;">&#x279C;</div>
+            <div style="background:#fef2f2;border:1px solid #fecaca;padding:4px 10px;font-size:.68rem;font-weight:700;color:#e11d48;text-align:center;">作業AI<br><small style="font-size:.55rem;color:#e11d48;">&#xA5; 課金</small></div>
+          </div>
+          <div style="font-size:.7rem;color:#888;margin-top:4px;">同じ処理で2回ぶんのAI利用料が発生する</div>
+        </div>
+      </div>
+      <!-- 速度 -->
+      <div style="border:2px solid #e5e5e5;border-left:4px solid #e11d48;padding:14px 16px;display:flex;align-items:center;gap:14px;">
+        <div style="font-size:1.6rem;flex-shrink:0;">&#x23F1;</div>
+        <div style="flex:1;">
+          <div style="font-size:.88rem;font-weight:800;color:#111;margin-bottom:4px;">返答が遅くなる</div>
+          <div style="display:flex;align-items:center;gap:4px;margin-top:6px;">
+            <div style="background:#f8f8f8;border:1px solid #e5e5e5;padding:3px 8px;font-size:.62rem;font-weight:600;">依頼</div>
+            <div style="font-size:.7rem;color:#ccc;">&#x279C;</div>
+            <div style="background:#f8f8f8;border:1px solid #e5e5e5;padding:3px 8px;font-size:.62rem;font-weight:600;">司令塔が解釈</div>
+            <div style="font-size:.7rem;color:#ccc;">&#x279C;</div>
+            <div style="background:#f8f8f8;border:1px solid #e5e5e5;padding:3px 8px;font-size:.62rem;font-weight:600;">作業AIに転送</div>
+            <div style="font-size:.7rem;color:#ccc;">&#x279C;</div>
+            <div style="background:#f8f8f8;border:1px solid #e5e5e5;padding:3px 8px;font-size:.62rem;font-weight:600;">結果を中継</div>
+          </div>
+          <div style="font-size:.7rem;color:#888;margin-top:4px;">中間に1ステップ入るぶん、毎回レスポンスが遅延</div>
+        </div>
+      </div>
+      <!-- 障害 -->
+      <div style="border:2px solid #e5e5e5;border-left:4px solid #e11d48;padding:14px 16px;display:flex;align-items:center;gap:14px;">
+        <div style="font-size:1.6rem;flex-shrink:0;">&#x1F4A5;</div>
+        <div style="flex:1;">
+          <div style="font-size:.88rem;font-weight:800;color:#111;margin-bottom:4px;">1箇所壊れると全停止</div>
+          <div style="display:flex;align-items:center;gap:6px;margin-top:6px;">
+            <div style="background:#111;color:#fff;padding:4px 10px;font-size:.68rem;font-weight:700;text-align:center;position:relative;">司令塔AI<div style="position:absolute;top:-2px;right:-2px;width:14px;height:14px;background:#e11d48;color:#fff;font-size:.55rem;font-weight:800;display:flex;align-items:center;justify-content:center;">&#x2715;</div></div>
+            <div style="font-size:.8rem;color:#e11d48;font-weight:800;">&#x279C;</div>
+            <div style="background:#f5f5f5;color:#ccc;padding:4px 10px;font-size:.68rem;font-weight:700;text-align:center;text-decoration:line-through;">LP作成AI</div>
+            <div style="background:#f5f5f5;color:#ccc;padding:4px 10px;font-size:.68rem;font-weight:700;text-align:center;text-decoration:line-through;">動画AI</div>
+            <div style="background:#f5f5f5;color:#ccc;padding:4px 10px;font-size:.68rem;font-weight:700;text-align:center;text-decoration:line-through;">その他</div>
+          </div>
+          <div style="font-size:.7rem;color:#888;margin-top:4px;">司令塔がダウンすると、全エージェントが動けなくなる</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右: 結論 -->
+    <div style="flex:0 0 260px;display:flex;flex-direction:column;gap:12px;">
+      <div style="border:2px solid #e5e5e5;padding:16px;flex:1;display:flex;flex-direction:column;justify-content:center;">
+        <div style="font-size:.72rem;font-weight:700;color:#999;letter-spacing:.1em;margin-bottom:8px;">将来の可能性</div>
+        <p style="font-size:.82rem;color:#666;line-height:1.7;">AIの種類が大幅に増え、タスクごとに最適なAIを自動選定する必要が出てくれば、司令塔の価値が出る可能性はある</p>
+      </div>
+      <div style="background:#111;padding:16px;flex:0;">
+        <div style="font-size:.72rem;font-weight:700;color:#999;letter-spacing:.1em;margin-bottom:6px;">&#x279C; 結論</div>
+        <div style="font-size:.92rem;font-weight:800;color:#fff;line-height:1.5;">現状では<br><span style="color:#e11d48;">デメリットの方が大きい</span></div>
+        <div style="margin-top:10px;background:#059669;color:#fff;padding:6px 12px;text-align:center;font-size:.78rem;font-weight:800;">個別指示型に切り替え</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- S7: システム全体構成 -->
+<div class="slide" data-slide="7">
+  <span class="slide-label">ARCHITECTURE</span>
+  <h2>システム全体の構成</h2>
+  <p style="text-align:center;margin-bottom:14px;font-size:.9rem;color:#888;">2つの「入口」と、共通の「LP作成エンジン」</p>
+  <div class="new-flow">
+    <div class="nf-box cw" style="min-width:200px;">&#x1F464; ユーザー（あなた）</div>
+    <div class="nf-arrow">&#x2B07;</div>
+    <div style="display:flex;gap:12px;">
+      <div class="nf-box slack" style="min-width:150px;">&#x1F4AC; Slack Bot<br><small style="font-size:.68rem;opacity:.8;">話しかけてLP作成</small></div>
+      <div class="nf-box" style="min-width:150px;background:#f8f8f8;border-color:#e5e5e5;">&#x1F4BB; 管理画面<br><small style="font-size:.68rem;color:#888;">確認・編集・DL</small></div>
+    </div>
+    <div class="nf-arrow">&#x2B07;</div>
+    <div class="nf-box agent" style="min-width:380px;padding:16px 30px;">&#x2699; LP作成エンジン（AI本体）<br><small style="font-size:.72rem;opacity:.85;">5つの専門AIが連携してLPを自動生成</small></div>
+  </div>
+</div>
+
+<!-- S8: 2つのモード + 2つの作り方 -->
+<div class="slide" data-slide="8">
+  <span class="slide-label">MODE</span>
+  <h2>2つのモード &#x00D7; 2つの作り方</h2>
+  <div style="display:flex;gap:16px;max-width:900px;width:100%;align-items:stretch;">
+
+    <!-- 新規作成 -->
+    <div style="flex:1;border:2px solid #bbf7d0;border-top:4px solid #059669;padding:0;display:flex;flex-direction:column;">
+      <div style="background:#059669;color:#fff;padding:8px 14px;font-size:.72rem;font-weight:800;letter-spacing:.1em;">&#x2795; MODE 1 &#x2500; 新規作成</div>
+      <div style="padding:14px;flex:1;display:flex;flex-direction:column;gap:7px;">
+        <div style="font-size:.82rem;font-weight:700;color:#059669;margin-bottom:2px;">ゼロからLPを自動生成</div>
+        <div style="display:flex;align-items:flex-start;gap:8px;background:#f0fdf4;padding:8px 10px;">
+          <div style="font-size:.9rem;flex-shrink:0;">&#x1F4AC;</div>
+          <div><div style="font-size:.75rem;font-weight:700;color:#111;">Slackで依頼するだけ</div><div style="font-size:.65rem;color:#888;">「健康食品のLP作って」と話しかける</div></div>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:8px;background:#f0fdf4;padding:8px 10px;">
+          <div style="font-size:.9rem;flex-shrink:0;">&#x1F399;</div>
+          <div><div style="font-size:.75rem;font-weight:700;color:#111;">AIがヒアリング &#x279C; 設計 &#x279C; 実装 &#x279C; 評価</div><div style="font-size:.65rem;color:#888;">品質基準を満たすまで自動で改善を繰り返す</div></div>
+        </div>
+        <div style="margin-top:auto;text-align:center;font-size:.72rem;font-weight:700;color:#059669;">LPが無い状態から完成品を自動生成</div>
+      </div>
+    </div>
+
+    <!-- 既存編集 -->
+    <div style="flex:1;border:2px solid #e5e5e5;border-top:4px solid #111;padding:0;display:flex;flex-direction:column;">
+      <div style="background:#111;color:#fff;padding:8px 14px;font-size:.72rem;font-weight:800;letter-spacing:.1em;">&#x270F; MODE 2 &#x2500; 既存編集</div>
+      <div style="padding:14px;flex:1;display:flex;flex-direction:column;gap:7px;">
+        <div style="font-size:.82rem;font-weight:700;color:#111;margin-bottom:2px;">手持ちのLPをAIが改善</div>
+        <div style="display:flex;align-items:flex-start;gap:8px;background:#f8f8f8;padding:8px 10px;">
+          <div style="font-size:.9rem;flex-shrink:0;">&#x1F4E6;</div>
+          <div><div style="font-size:.75rem;font-weight:700;color:#111;">ZIPファイルをアップロード</div><div style="font-size:.65rem;color:#888;">既存LP（HTML/CSS/JS/画像）をまるごと送る</div></div>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:8px;background:#f8f8f8;padding:8px 10px;">
+          <div style="font-size:.9rem;flex-shrink:0;">&#x1F4DD;</div>
+          <div><div style="font-size:.75rem;font-weight:700;color:#111;">修正・改善の指示を添える</div><div style="font-size:.65rem;color:#888;">「CTAを目立たせて」「色味を暖色に」など</div></div>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:8px;background:#f8f8f8;padding:8px 10px;">
+          <div style="font-size:.9rem;flex-shrink:0;">&#x1F916;</div>
+          <div><div style="font-size:.75rem;font-weight:700;color:#111;">AIが中身を読み取って自動修正</div><div style="font-size:.65rem;color:#888;">構造を理解し、指示通りに改善して返却</div></div>
+        </div>
+        <div style="margin-top:auto;text-align:center;font-size:.72rem;font-weight:700;color:#111;">過去に作ったLPもAIで改善可能</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 2つの作り方 -->
+  <div style="display:flex;gap:16px;max-width:900px;width:100%;margin-top:14px;">
+
+    <div style="flex:1;border:2px solid #bfdbfe;border-top:4px solid #2563eb;padding:0;display:flex;flex-direction:column;">
+      <div style="background:#2563eb;color:#fff;padding:6px 14px;font-size:.68rem;font-weight:800;letter-spacing:.1em;">&#x1F4BB; STYLE 1 &#x2500; Code方式</div>
+      <div style="padding:12px;flex:1;display:flex;flex-direction:column;gap:6px;">
+        <div style="display:flex;align-items:flex-start;gap:8px;background:#eff6ff;padding:7px 10px;">
+          <div style="font-size:.85rem;flex-shrink:0;">&#x2699;</div>
+          <div><div style="font-size:.72rem;font-weight:700;color:#111;">HTML/CSSのコードで構築</div><div style="font-size:.62rem;color:#888;">レイアウト・装飾をプログラムで表現</div></div>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:8px;background:#eff6ff;padding:7px 10px;">
+          <div style="font-size:.85rem;flex-shrink:0;">&#x270F;</div>
+          <div><div style="font-size:.72rem;font-weight:700;color:#111;">文言・レイアウトの変更が簡単</div><div style="font-size:.62rem;color:#888;">コードを書き換えるだけですぐ反映</div></div>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:8px;background:#eff6ff;padding:7px 10px;">
+          <div style="font-size:.85rem;flex-shrink:0;">&#x26A1;</div>
+          <div><div style="font-size:.72rem;font-weight:700;color:#111;">ページが軽く、表示が速い</div><div style="font-size:.62rem;color:#888;">画像に頼らないので読み込みが速い</div></div>
+        </div>
+        <div style="margin-top:auto;text-align:center;font-size:.7rem;font-weight:700;color:#2563eb;">修正・更新が多いLPに最適</div>
+      </div>
+    </div>
+
+    <div style="flex:1;border:2px solid #bbf7d0;border-top:4px solid #059669;padding:0;display:flex;flex-direction:column;">
+      <div style="background:#059669;color:#fff;padding:6px 14px;font-size:.68rem;font-weight:800;letter-spacing:.1em;">&#x1F3A8; STYLE 2 &#x2500; Canvas方式</div>
+      <div style="padding:12px;flex:1;display:flex;flex-direction:column;gap:6px;">
+        <div style="display:flex;align-items:flex-start;gap:8px;background:#f0fdf4;padding:7px 10px;">
+          <div style="font-size:.85rem;flex-shrink:0;">&#x1F5BC;</div>
+          <div><div style="font-size:.72rem;font-weight:700;color:#111;">AIが画像を生成してビジュアル構築</div><div style="font-size:.62rem;color:#888;">セクションごとにリッチな画像を自動生成</div></div>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:8px;background:#f0fdf4;padding:7px 10px;">
+          <div style="font-size:.85rem;flex-shrink:0;">&#x2728;</div>
+          <div><div style="font-size:.72rem;font-weight:700;color:#111;">デザイン性の高い仕上がり</div><div style="font-size:.62rem;color:#888;">写真・イラストを活かした訴求力のある見た目</div></div>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:8px;background:#f0fdf4;padding:7px 10px;">
+          <div style="font-size:.85rem;flex-shrink:0;">&#x1F3AF;</div>
+          <div><div style="font-size:.72rem;font-weight:700;color:#111;">世界観を統一したトーンで生成</div><div style="font-size:.62rem;color:#888;">色温度・光・構図をLP全体で揃える</div></div>
+        </div>
+        <div style="margin-top:auto;text-align:center;font-size:.7rem;font-weight:700;color:#059669;">ビジュアル重視のリッチなLPに最適</div>
+      </div>
+    </div>
+
+  </div>
+  <p style="text-align:center;margin-top:8px;font-size:.75rem;color:#999;">モード &#x00D7; 作り方は自由に組み合わせ可能。すべてスマホ表示に最適化</p>
+</div>
+
+<!-- S9: 5つの専門AI -->
+<div class="slide" data-slide="8">
+  <span class="slide-label">TEAM</span>
+  <h2><span class="green">5つの専門AI</span> &#x2500; それぞれの「担当」</h2>
+  <p style="text-align:center;margin-bottom:10px;font-size:.85rem;color:#888;">STEP 1: 要望を聞く &#x2192; STEP 2: 作る・チェックする</p>
+  <div class="ai-org">
+    <div style="font-size:.72rem;font-weight:700;color:#999;letter-spacing:.1em;margin-bottom:4px;">STEP 1 &#x2500; ヒアリング</div>
+    <div class="ai-org-row">
+      <div class="ai-member">
+        <div class="ai-emoji">&#x1F399;</div>
+        <div class="ai-name">構成ヒアリングAI</div>
+        <div class="ai-role">何を載せるか・文言を聞く</div>
+      </div>
+      <div class="ai-member">
+        <div class="ai-emoji">&#x1F3A8;</div>
+        <div class="ai-name">デザインヒアリングAI</div>
+        <div class="ai-role">色・雰囲気・参考画像を聞く</div>
+      </div>
+    </div>
+    <div class="org-line"></div>
+    <div style="font-size:.72rem;font-weight:700;color:#999;letter-spacing:.1em;margin-top:4px;margin-bottom:4px;">STEP 2 &#x2500; 設計・実装・評価</div>
+    <div class="ai-org-row">
+      <div class="ai-member agent-member">
+        <div class="ai-emoji">&#x1F50D;</div>
+        <div class="ai-name">設計AI</div>
+        <div class="ai-role">全体の設計図を作る<br>考える人</div>
+      </div>
+      <div class="ai-member agent-member">
+        <div class="ai-emoji">&#x1F528;</div>
+        <div class="ai-name">実装AI</div>
+        <div class="ai-role">コードと画像を作る<br>作る人</div>
+      </div>
+      <div class="ai-member agent-member">
+        <div class="ai-emoji">&#x2B50;</div>
+        <div class="ai-name">評価AI</div>
+        <div class="ai-role">出来栄えを採点する<br>検査する人</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- S9: LP完成までの流れ（詳細版） -->
+<div class="slide" data-slide="9">
+  <span class="slide-label">WORKFLOW</span>
+  <h2>LP完成までの流れ &#x2500; <span class="green">AI 5体が自律的に連携</span></h2>
+  <div style="display:flex;gap:18px;max-width:920px;width:100%;align-items:stretch;margin-top:6px;">
+
+    <!-- PHASE 1 -->
+    <div style="flex:0 0 200px;border:2px solid #e5e5e5;border-top:4px solid #111;display:flex;flex-direction:column;">
+      <div style="background:#111;color:#fff;padding:8px 12px;font-size:.65rem;font-weight:700;letter-spacing:.1em;">PHASE 1 &#x2500; HEARING</div>
+      <div style="padding:12px;flex:1;display:flex;flex-direction:column;gap:8px;">
+        <div style="text-align:center;font-size:.82rem;font-weight:800;color:#111;">ヒアリング</div>
+        <div style="background:#f8f8f8;border:2px solid #e5e5e5;padding:10px;text-align:center;">
+          <div style="font-size:1.2rem;">&#x1F399;</div>
+          <div style="font-size:.72rem;font-weight:700;">構成ヒアリングAI</div>
+          <div style="font-size:.62rem;color:#888;margin-top:2px;">何を載せるか<br>ターゲット・訴求を確定</div>
+        </div>
+        <div style="text-align:center;font-size:.9rem;color:#ccc;">&#x2B07;</div>
+        <div style="background:#f8f8f8;border:2px solid #e5e5e5;padding:10px;text-align:center;">
+          <div style="font-size:1.2rem;">&#x1F3A8;</div>
+          <div style="font-size:.72rem;font-weight:700;">デザインヒアリングAI</div>
+          <div style="font-size:.62rem;color:#888;margin-top:2px;">色・雰囲気・参考画像<br>作成方式を確定</div>
+        </div>
+        <div style="margin-top:auto;text-align:center;">
+          <div style="font-size:.58rem;color:#999;margin-bottom:4px;">&#x2B07; 成果物</div>
+          <div style="display:flex;flex-wrap:wrap;gap:3px;justify-content:center;">
+            <span style="background:#f0f0f0;padding:2px 5px;font-size:.55rem;font-weight:600;">サイトマップ</span>
+            <span style="background:#f0f0f0;padding:2px 5px;font-size:.55rem;font-weight:600;">デザイン方針</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PHASE 2 -->
+    <div style="flex:1;border:2px solid #059669;border-top:4px solid #059669;display:flex;flex-direction:column;">
+      <div style="background:#059669;color:#fff;padding:8px 12px;font-size:.65rem;font-weight:700;letter-spacing:.1em;">PHASE 2 &#x2500; BUILD &amp; EVALUATE &#x2500; AUTONOMOUS LOOP</div>
+      <div style="padding:12px;flex:1;display:flex;flex-direction:column;gap:6px;">
+        <div style="text-align:center;font-size:.82rem;font-weight:800;color:#059669;">AIだけで設計 &#x279C; 実装 &#x279C; 評価 を自動で繰り返す</div>
+
+        <!-- 3AI横並び -->
+        <div style="display:flex;gap:8px;">
+          <div style="flex:1;background:#f0fdf4;border:2px solid #bbf7d0;padding:10px;text-align:center;">
+            <div style="font-size:1.2rem;">&#x1F50D;</div>
+            <div style="font-size:.72rem;font-weight:700;color:#059669;">設計AI</div>
+            <div style="font-size:.58rem;color:#888;margin-top:3px;line-height:1.4;">
+              ページ全体の設計図を作成<br>
+              セクション構成・カラー・<br>フォント・素材リストを策定
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;font-size:1rem;color:#059669;">&#x279C;</div>
+          <div style="flex:1;background:#f0fdf4;border:2px solid #bbf7d0;padding:10px;text-align:center;">
+            <div style="font-size:1.2rem;">&#x1F528;</div>
+            <div style="font-size:.72rem;font-weight:700;color:#059669;">実装AI</div>
+            <div style="font-size:.58rem;color:#888;margin-top:3px;line-height:1.4;">
+              HTML/CSS/JSを自動生成<br>
+              画像もAIで生成・配置<br>
+              スマホ最適化レイアウト
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;font-size:1rem;color:#059669;">&#x279C;</div>
+          <div style="flex:1;background:#f0fdf4;border:2px solid #bbf7d0;padding:10px;text-align:center;">
+            <div style="font-size:1.2rem;">&#x2B50;</div>
+            <div style="font-size:.72rem;font-weight:700;color:#059669;">評価AI</div>
+            <div style="font-size:.58rem;color:#888;margin-top:3px;line-height:1.4;">
+              5つの観点で100点満点採点<br>
+              80点以上で合格判定<br>
+              改善指示を自動で作成
+            </div>
+          </div>
+        </div>
+
+        <!-- ループ表現 -->
+        <div style="display:flex;align-items:center;gap:10px;margin-top:2px;">
+          <div style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;">
+            <span style="background:#059669;color:#fff;padding:3px 10px;font-size:.72rem;font-weight:800;">PASS</span>
+            <span style="font-size:.72rem;color:#059669;font-weight:600;">80点以上 &#x279C; 次のフェーズへ</span>
+          </div>
+          <div style="width:1px;height:24px;background:#e5e5e5;"></div>
+          <div style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;">
+            <span style="background:#e11d48;color:#fff;padding:3px 10px;font-size:.72rem;font-weight:800;">FAIL</span>
+            <span style="font-size:.72rem;color:#e11d48;font-weight:600;">&#x1F504; 改善指示を元に自動修正（最大3回）</span>
+          </div>
+        </div>
+
+        <!-- 成果物 -->
+        <div style="display:flex;gap:3px;justify-content:center;margin-top:auto;flex-wrap:wrap;">
+          <span style="background:#f0f0f0;padding:2px 5px;font-size:.55rem;font-weight:600;">設計仕様書</span>
+          <span style="background:#f0f0f0;padding:2px 5px;font-size:.55rem;font-weight:600;">機能一覧</span>
+          <span style="background:#f0f0f0;padding:2px 5px;font-size:.55rem;font-weight:600;">素材リスト</span>
+          <span style="background:#f0f0f0;padding:2px 5px;font-size:.55rem;font-weight:600;">品質レポート</span>
+          <span style="background:#f0f0f0;padding:2px 5px;font-size:.55rem;font-weight:600;">学習記録</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- PHASE 3 -->
+    <div style="flex:0 0 140px;border:2px solid #e5e5e5;border-top:4px solid #111;display:flex;flex-direction:column;">
+      <div style="background:#111;color:#fff;padding:8px 12px;font-size:.65rem;font-weight:700;letter-spacing:.1em;">PHASE 3</div>
+      <div style="padding:12px;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center;">
+        <div style="font-size:2rem;">&#x1F389;</div>
+        <div style="font-size:.88rem;font-weight:800;color:#111;">納品</div>
+        <div style="font-size:.62rem;color:#888;line-height:1.5;">
+          index.html<br>
+          style.css<br>
+          script.js<br>
+          画像ファイル群
+        </div>
+        <div style="margin-top:8px;display:flex;flex-direction:column;gap:3px;">
+          <span style="background:#f0fdf4;padding:2px 5px;font-size:.58rem;font-weight:700;color:#059669;">プレビューURL発行</span>
+          <span style="background:#f0fdf4;padding:2px 5px;font-size:.58rem;font-weight:700;color:#059669;">ZIPダウンロード</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ボトムバー -->
+  <div style="display:flex;gap:12px;max-width:920px;width:100%;margin-top:12px;align-items:center;">
+    <div style="background:#111;color:#fff;padding:10px 18px;font-size:.82rem;font-weight:800;flex-shrink:0;">
+      &#x1F464; 人間がやること
+    </div>
+    <div style="font-size:.88rem;color:#444;">
+      <strong>最初に依頼を出すだけ</strong>。あとは5体のAIが自律的に連携し、品質基準を満たすまで自動で改善を繰り返す
+    </div>
+    <div style="margin-left:auto;font-size:.62rem;color:#bbb;flex-shrink:0;">
+      参考: <a href="https://www.anthropic.com/engineering/harness-design-long-running-apps" target="_blank" style="color:#999;text-decoration:underline;">Anthropic &#x2500; Harness Design for Long-Running Apps</a>
+    </div>
+  </div>
+</div>
+
+<!-- S10: 品質チェック -->
+<div class="slide" data-slide="10">
+  <span class="slide-label">QUALITY</span>
+  <h2>品質チェック &#x2500; <span class="green">5つの観点で採点</span></h2>
+  <div style="display:flex;gap:24px;max-width:880px;width:100%;align-items:flex-start;flex-wrap:wrap;">
+    <div style="flex:1;min-width:400px;">
+      <div class="bar-chart">
+        <div class="bar-row">
+          <div class="bar-label">スマホの使いやすさ</div>
+          <div class="bar-track"><div class="bar-fill dark-bar" style="width:100%;">30%</div></div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">ボタンの分かりやすさ</div>
+          <div class="bar-track"><div class="bar-fill dark-bar" style="width:83%;">25%</div></div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">デザインの質</div>
+          <div class="bar-track"><div class="bar-fill green-bar" style="width:67%;">20%</div></div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">オリジナリティ</div>
+          <div class="bar-track"><div class="bar-fill green-bar" style="width:50%;">15%</div></div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">表示速度</div>
+          <div class="bar-track"><div class="bar-fill green-bar" style="width:33%;">10%</div></div>
+        </div>
+      </div>
+    </div>
+    <div style="flex:0 0 280px;">
+      <div style="border:2px solid #059669;padding:16px;text-align:center;margin-bottom:10px;">
+        <div style="font-size:1.6rem;margin-bottom:4px;">&#x1F4AF;</div>
+        <div style="font-size:1.1rem;font-weight:900;color:#059669;">合格</div>
+        <p style="font-size:.82rem;margin-top:4px;">総合点が<strong>80点以上</strong>で合格</p>
+      </div>
+      <div style="border:2px solid #e11d48;padding:16px;text-align:center;">
+        <div style="font-size:1.6rem;margin-bottom:4px;">&#x1F504;</div>
+        <div style="font-size:1.1rem;font-weight:900;color:#e11d48;">不合格</div>
+        <p style="font-size:.82rem;margin-top:4px;">自動で修正して再チェック<br>（最大3回まで）</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- S11: 安全装置 -->
+<div class="slide" data-slide="11">
+  <span class="slide-label">SAFETY</span>
+  <h2>安全装置 &#x2500; <span class="accent">AIが暴走しない仕組み</span></h2>
+  <p style="text-align:center;margin-bottom:10px;font-size:.88rem;color:#888;">品質チェックに不合格が続いた場合、3段階で自動的にブレーキがかかる</p>
+  <div class="guard-steps">
+    <div class="guard-step ok">
+      <div class="gs-icon">&#x1F504;</div>
+      <div>
+        <div class="gs-level">LEVEL 1</div>
+        <div class="gs-title">自動で修正してやり直し</div>
+        <div class="gs-desc">不合格の理由をもとに、AIが自力で修正する</div>
+      </div>
+    </div>
+    <div class="guard-step warn">
+      <div class="gs-icon">&#x26A0;&#xFE0F;</div>
+      <div>
+        <div class="gs-level">LEVEL 2</div>
+        <div class="gs-title">同じ失敗の繰り返しを検知</div>
+        <div class="gs-desc">同じ原因で3回失敗 &#x2192; 「堂々巡りしている」と自動判断</div>
+      </div>
+    </div>
+    <div class="guard-step block">
+      <div class="gs-icon">&#x1F6D1;</div>
+      <div>
+        <div class="gs-level">LEVEL 3</div>
+        <div class="gs-title" style="color:#e11d48;">強制停止（ブロック）</div>
+        <div class="gs-desc">これ以上は進めず、人の判断を待つ。AIが際限なく作り直すことを防止</div>
+      </div>
+    </div>
+  </div>
+  <div class="info-box" style="margin-top:10px;">
+    <p>AIが際限なく作り直し続けることを<strong>3段階の安全装置</strong>で自動的に防止します</p>
+  </div>
+</div>
+
+<!-- S12: 管理画面 -->
+<div class="slide" data-slide="12">
+  <span class="slide-label">DASHBOARD</span>
+  <h2>管理画面でできること</h2>
+  <div class="mock-cards">
+    <div class="mock-card">
+      <div class="mc-header">&#x1F4CB; プロジェクト一覧</div>
+      <div class="mc-body">
+        <div class="mc-row"><span>健康食品LP</span><span class="mc-tag ok">完成</span></div>
+        <div class="mc-row"><span>美容サロンLP</span><span class="mc-tag progress">作成中</span></div>
+        <div class="mc-row"><span>不動産LP</span><span class="mc-tag error">エラー</span></div>
+        <p style="font-size:.75rem;color:#888;margin-top:8px;line-height:1.6;">全プロジェクトの進捗を一目で確認<br>15秒ごとに自動更新</p>
+      </div>
+    </div>
+    <div class="mock-card">
+      <div class="mc-header">&#x270F; 編集画面</div>
+      <div class="mc-body">
+        <div style="display:flex;gap:4px;margin-bottom:8px;">
+          <span class="mc-tag ok" style="background:#f0f0f0;color:#111;">HTML</span>
+          <span class="mc-tag ok" style="background:#f0f0f0;color:#111;">CSS</span>
+          <span class="mc-tag ok" style="background:#f0f0f0;color:#111;">JS</span>
+        </div>
+        <div style="background:#1e293b;padding:8px;font-family:monospace;font-size:.7rem;color:#94a3b8;line-height:1.7;">
+          <span style="color:#7dd3fc;">&lt;section</span> <span style="color:#86efac;">class=</span><span style="color:#fde68a;">"hero"</span><span style="color:#7dd3fc;">&gt;</span><br>
+          &nbsp;&nbsp;<span style="color:#e2e8f0;">見出しテキスト...</span><br>
+          <span style="color:#7dd3fc;">&lt;/section&gt;</span>
+        </div>
+        <p style="font-size:.75rem;color:#888;margin-top:8px;line-height:1.6;">AIが作ったLPを直接編集可能<br>スマホ/PC表示の切替</p>
+      </div>
+    </div>
+    <div class="mock-card">
+      <div class="mc-header">&#x1F441; プレビュー &amp; ダウンロード</div>
+      <div class="mc-body" style="text-align:center;padding:16px;">
+        <div style="width:60px;height:100px;border:2px solid #ddd;margin:0 auto 10px;display:flex;align-items:center;justify-content:center;font-size:1.6rem;">&#x1F4F1;</div>
+        <p style="font-size:.75rem;color:#888;line-height:1.6;">実際の見た目をその場で確認<br>ZIPでまるごとダウンロード</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- S13: Slack連携 -->
+<div class="slide" data-slide="13">
+  <span class="slide-label">SLACK</span>
+  <h2>Slackでの使い方</h2>
+  <p style="text-align:center;margin-bottom:10px;font-size:.88rem;color:#888;">話しかけるだけ。完成したらURLが届く</p>
+  <div style="display:flex;gap:24px;max-width:860px;width:100%;align-items:flex-start;flex-wrap:wrap;">
+    <div style="flex:1;min-width:340px;">
+      <div class="slack-flow">
+        <div class="sf-step">
+          <div class="sf-icon">&#x1F4AC;</div>
+          <div><div class="sf-text">Slackでメッセージを送る</div><div class="sf-sub">「健康食品のLPを作って」</div></div>
+        </div>
+        <div class="sf-step">
+          <div class="sf-icon">&#x1F916;</div>
+          <div><div class="sf-text">AIが自動で作成開始</div><div class="sf-sub">テキスト・画像・URLも受け取れる</div></div>
+        </div>
+        <div class="sf-step">
+          <div class="sf-icon">&#x23F3;</div>
+          <div><div class="sf-text">進捗を自動で通知</div><div class="sf-sub">10秒ごとに状態をチェック</div></div>
+        </div>
+        <div class="sf-step sf-done">
+          <div class="sf-icon">&#x1F389;</div>
+          <div><div class="sf-text" style="color:#059669;">完成したらURLをお届け</div><div class="sf-sub">プレビューリンク + 管理画面で確認</div></div>
+        </div>
+      </div>
+    </div>
+    <div style="flex:0 0 260px;">
+      <div class="info-box" style="max-width:260px;margin-top:0;">
+        <h3>&#x1F512; セキュリティ</h3>
+        <p style="font-size:.82rem;">許可されたユーザーと<br>チャンネルのみ利用可能</p>
+      </div>
+      <div class="info-box green-b" style="max-width:260px;margin-top:10px;">
+        <h3 style="color:#059669;">&#x1F504; 修正もSlackで</h3>
+        <p style="font-size:.82rem;">同じスレッドに「ここを直して」と<br>送ると修正版を自動作成</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- S16: まとめ -->
+<div class="slide" data-slide="16">
+  <span class="slide-label">SUMMARY</span>
+  <h2>まとめ</h2>
+  <ul style="max-width:720px;">
+    <li>Chatwork &#x2192; <strong>Slackに移行</strong>、司令塔AIを廃止 &#x2192; <span class="green">セキュリティ強化・コスト削減・速度向上</span></li>
+    <li><strong>5つの専門AI</strong>がヒアリングから納品まで自動処理 &#x2192; <span class="green">人間は最初に依頼するだけ</span></li>
+    <li><strong>3段階の安全装置</strong>でAIの暴走を防止 &#x2192; <span class="green">品質を自動で担保</span></li>
+    <li><strong>管理画面 + Slack</strong>の2つの入口 &#x2192; <span class="green">依頼・確認・編集まで一貫して対応</span></li>
+  </ul>
+  <div style="margin-top:24px;padding:14px 28px;background:#111;display:inline-block;">
+    <span style="font-size:1rem;font-weight:800;color:#fff;">Slack &#x2500; 管理画面 で<span style="color:#e11d48;">LP作成を完全自動化</span></span>
+  </div>
+</div>
+
+</div><!-- /deck -->
+
+<div class="nav">
+  <button id="prev" aria-label="前">&#x2039;</button>
+  <span class="counter" id="counter">1 / 15</span>
+  <button id="next" aria-label="次">&#x203A;</button>
+</div>
+<div class="hint">&#x2190; &#x2192; キーで操作</div>
+
+<script>
+(function(){
+  var slides=document.querySelectorAll('.slide'),total=slides.length;
+  var current=0;
+  var counter=document.getElementById('counter'),progress=document.getElementById('progress');
+  function go(n){
+    if(n<0||n>=total)return;
+    slides[current].classList.remove('active');
+    current=n;slides[current].classList.add('active');
+    counter.textContent=(current+1)+' / '+total;
+    progress.style.width=((current+1)/total*100)+'%';
+  }
+  document.addEventListener('keydown',function(e){
+    if(e.key==='ArrowRight'||e.key===' '){e.preventDefault();go(current+1);}
+    if(e.key==='ArrowLeft'){e.preventDefault();go(current-1);}
+    if(e.key==='Home'){e.preventDefault();go(0);}
+    if(e.key==='End'){e.preventDefault();go(total-1);}
+  });
+  document.getElementById('next').addEventListener('click',function(){go(current+1);});
+  document.getElementById('prev').addEventListener('click',function(){go(current-1);});
+  var tx=0;
+  document.addEventListener('touchstart',function(e){tx=e.changedTouches[0].screenX;});
+  document.addEventListener('touchend',function(e){var d=tx-e.changedTouches[0].screenX;if(Math.abs(d)>50){d>0?go(current+1):go(current-1);}});
+  go(0);
+})();
+</script>
+</body>
+</html>
